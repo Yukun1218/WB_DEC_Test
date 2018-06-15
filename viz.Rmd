@@ -1,0 +1,174 @@
+---
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r global, include=FALSE, echo=FALSE}
+
+
+library(highcharter)
+library(tidyverse)
+library(stringr)
+library(dplyr)
+library(shiny)
+library(shinythemes)
+library(shinydashboard)
+
+# Load Data
+load('data1.RData')
+
+countryChoice <- sort(unique(data1$country)) #Alphabetically sorting
+
+region_IDA_IBRD <- unique(filter(data1, grepl('IDA & IBRD', country))$country )
+region_all_income <- unique(filter(data1, grepl('all income levels', country))$country )
+
+```
+
+
+```{r, echo = FALSE}
+shinyApp(
+  ui <- dashboardPage(
+  
+  dashboardHeader(title = 'DEC Test'),
+  dashboardSidebar(
+    
+    selectInput("country", label = "Select Country:",
+            choices = countryChoice , selected = 'Angola'),
+    
+    selectInput('region', label = "Region View:", 
+                choices = c('IDA/IBRD', 'All Income'), selected = 'IDA/IBRD'),
+    
+    sliderInput("year", label = "Since Year:",
+            min = 1960, max = 2018, value = 1, step = 1)
+
+    
+  ),
+  dashboardBody(
+     tags$head(
+      tags$style(
+      HTML('.content-wrapper {
+               overflow: auto;
+           }'
+      )
+    )
+  ),
+    
+    column(9,
+      downloadLink("downloadData", "Download Full Data"),
+
+      highchartOutput('lineChart_country', height = '700px')),
+    column(3,
+       h4('Main Findings:'), 
+       tags$ul(tags$li('World-wide index of access to sanitation facilites fluntuated over time since 1990 (available data) as the light blue dashline shows in the chart. It drops from around 3000 to below 2000 during 1991-1999, except for 1995, where it peaked up to 2840. The year of 2000 saw the historical high of improved sanitation index, followed by continues flunctuation in 2001 -2010. And the index has kept dropping since 2010 till now.'), 
+               br(),
+               tags$li('IDA/IBRD regional trend, on the other hand, seems to be more stable. All regional mean keeps going up since 1990. Europe and Central Asia kept in the 1st place, following by Middle East & North America region, who took a leap and jumped to the first place in 2012. '), 
+               br(),
+               tags$li('Meanwhile, all income level regional index reveals similar rise and fall pattern, with high income groups score higher and low income groups score much lower. Europe and Central Asia, Middle East & North America and Latin America & Caribbean are the top 3 and Sub-Saharan Africa is the lowest.'))
+    )
+  )
+)
+    ,
+  server <- function(input, output) {
+
+  # ---------Data Download--------------
+  download_raw <- reactive({
+
+    data <- data1
+  
+    data
+  }) 
+  
+
+  output$downloadData <- downloadHandler(
+  
+   filename = function() {
+      paste('AllCountry_', "Raw_Data.csv", sep="")
+    },
+    content = function(file) {
+      write.csv(download_raw(), file)
+    }
+  )
+  
+  # ------------End Download-------------
+  
+  output$lineChart_country <- renderHighchart({
+
+  data <- filter(data1, #country == 'Zambia') %>%
+    country == input$country,
+    date >= input$year) %>%
+    as.data.frame() %>%
+    group_by(country, date) %>%
+    distinct(.keep_all = T) %>%
+    arrange(date)
+
+  world <- filter(data1, 
+                 country == 'World', 
+                 date >= input$year) %>%
+    as.data.frame() %>%
+    group_by(country, date) %>%
+    distinct(.keep_all = T) %>%
+    arrange(date)
+  
+      if (input$region == 'IDA/IBRD'){
+      selectedRegion <- unique(filter(data1, grepl('IDA & IBRD', country))$country )
+    } else selectedRegion = unique(filter(data1, grepl('all income levels', country))$country )
+    
+  data_region <- filter(data1, #country == 'Zambia') %>%
+    country %in% selectedRegion,
+    date >= input$year) %>%
+    as.data.frame() %>%
+    group_by(country, date) %>%
+    distinct(.keep_all = T) %>%
+    arrange(date)
+  
+  colors <- c('#1e5636', '#578c49', '#99be8f', '#8f8350', '#b6a576', '#525335', '#4c602f')
+  
+  lineChart <- highchart() %>%
+    hc_add_series(data, "line", lineWidth= 3, hcaes(x = date, y = value, group = country), color = "#981515") %>%
+    hc_title(text =  paste('Overview highlighting', input$country, ': ', data$indicator[1]),
+             style = list(fontSize = "15px")) %>%
+    hc_yAxis(
+      title = list(text = "Improved Santation Facilities")) %>%
+    hc_xAxis(
+      title = list(text = "Year")
+    ) %>%
+    hc_add_series(name='World', data = world, type ='line', dashStyle = "longdash",lineWidth=1, hcaes(x = date, y = value, group = country), color ='#add8e6') %>%
+    hc_add_series(data_region, type ="line",dashStyle = "longdash", lineWidth=1, hcaes(x = date, y = value, size = value, group = country)) %>%
+    hc_colors(colors)
+    
+    
+  }
+ )
+  
+ #  output$linechart_region <- renderHighchart({
+ #    
+ #    if (input$region == 'IDA/IBRD'){
+ #      selectedRegion <- unique(filter(data1, grepl('IDA & IBRD', country))$country )
+ #    } else selectedRegion = unique(filter(data1, grepl('all income levels', country))$country )
+ #    
+ #  data_region <- filter(data1, #country == 'Zambia') %>%
+ #    country %in% selectedRegion,
+ #    date >= input$year) %>%
+ #    as.data.frame() %>%
+ #    group_by(country, date) %>%
+ #    distinct(.keep_all = T) %>%
+ #    arrange(date)
+ #  
+ #  colors <- c('#1e5636', '#578c49', '#99be8f', '#8f8350', '#b6a576', '#525335', '#4c602f')
+ #    
+ #  hchart(data_region, "scatter", hcaes(x = date, y = value, size = value, group = country)) %>%
+ #    hc_colors(colors)
+ #    
+ #  }
+ # )
+    
+  }
+)
+
+
+```
+
+
