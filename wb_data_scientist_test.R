@@ -41,7 +41,7 @@ data1 <- data %>%
   mutate(value = round(as.numeric(value), digits = 2)) %>% # remove extra long decimals
   na.omit() # remove NAs
 
-# Save the data for .rmd 
+# Save the data for .rmd
 save(data1, file = 'C:/Users/wb516609/desktop/WB_DS_Test/data1.RData') # please remember to change directory
 
 # Just a rough test on how the data look like
